@@ -1,12 +1,12 @@
 #!/bin/bash
-#SBATCH -p standard  -o proseq.PS_Untreated.log -t 4:00:00
+#SBATCH -p standard  -o proseq.mapping.bowtie2.log -t 4:00:00
 #SBATCH -c 8 --mem=96G
 
 module load fastqc
 module load fastp
 module load bowtie2
 module load samtools
-module load deeptools
+module load deeptools/2.5.3
 module load umi-tools/b1
 
 ###########################################################
