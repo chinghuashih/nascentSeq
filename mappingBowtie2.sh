@@ -111,73 +111,68 @@ mkdir -p logs/fastp
 mkdir -p logs/rRNA
 mkdir -p trimmedFastq
 if [[ ${PAIRED} == "Y" ]]; then
-    ## Branches for either 3' UMI or both UMIs
-    if [[ $THREEP_UMI == "Y" ]]
-        then
-        # Branch for both UMIs
-        if [[ $FIVEP_UMI == "Y" ]]
-            then
-            for PAIR in $(ls fastq | sed 's/_R[1-2].*//' | uniq )
-                do
-                    if [ ! -s trimmedFastq/${PAIR}_R1.fastq ]
-                        then
-                        echo "trimming adapters and filtering rRNA reads for "${PAIR}
-                        (fastp \
-                        -i fastq/${PAIR}_R1.fastq \
-                        -I fastq/${PAIR}_R2.fastq \
-                        --adapter_sequence $ADAPTOR_1 \
-                        --adapter_sequence_r2 $ADAPTOR_2 \
-                        --umi \
-                        --stdout \
-                        --umi_loc=per_read \
-                        --umi_len=${UMI_LEN} \
-                        --html logs/fastp/${PAIR}_fastp.html \
-                        -w $(echo ${THREADS}/3 | bc)\
-                        -c \
-                        --overlap_len_require 15 2> logs/fastp/${PAIR}_fastp.log) |
-                        (bowtie2 \
-                        --fast-local \
-                        --un-conc trimmedFastq/${PAIR}.fastq \
-                        --interleaved - \
-                        -x ${RDNA} \
-                        --threads $(echo ${THREADS}/3*2 | bc) 2> logs/rRNA/${PAIR}_rRNA_bowtie.log) > /dev/null
-                    fi
-                done
-        # Branch for just 3' UMI
-            else
-            for PAIR in $(ls fastq | sed 's/_R[1-2].*//' | uniq )
-                do
-                    if [ ! -s trimmedFastq/${PAIR}_R1.fastq ]
-                    then
-                    echo "trimming adapters and filtering rRNA reads for "${PAIR}
-                    (fastp \
-                    -i fastq/${PAIR}_R1.fastq \
-                    -I fastq/${PAIR}_R2.fastq \
-                    --adapter_sequence $ADAPTOR_1 \
-                    --adapter_sequence_r2 $ADAPTOR_2 \
-                    --umi \
-                    --stdout \
-                    --umi_loc=read1 \
-                    --umi_len=${UMI_LEN} \
-                    --html logs/fastp/${PAIR}_fastp.html \
-                    -w $(echo ${THREADS}/3 | bc) \
-                    -c \
-                    --overlap_len_require 15 2> logs/fastp/${PAIR}_fastp.log) |
-                    (bowtie2 \
-                    --fast-local \
-                    --un-conc trimmedFastq/${PAIR}.fastq \
-                    --interleaved - \
-                    -x ${RDNA} \
-                    --threads $(echo ${THREADS}/3*2 | bc) 2> logs/rRNA/${PAIR}_rRNA_bowtie.log) > /dev/null
-                    fi
-                done
-            fi
+        ## Branches for either 3' UMI or both UMIs
+        if [[ $THREEP_UMI == "Y" ]]; then
+                # Branch for both UMIs
+                if [[ ${FIVEP_UMI} == "Y" ]]; then
+                        for PAIR in $(ls fastq | sed 's/_R[1-2].*//' | uniq )
+                        do
+                                if [ ! -s trimmedFastq/${PAIR}_R1.fastq ]; then
+                                        echo "trimming adapters and filtering rRNA reads for "${PAIR}
+                                        (fastp \
+                                                -i fastq/${PAIR}_R1.fastq \
+                                                -I fastq/${PAIR}_R2.fastq \
+                                                --adapter_sequence    ${ADAPTOR_1} \
+                                                --adapter_sequence_r2 ${ADAPTOR_2} \
+                                                --umi \
+                                                --stdout \
+                                                --umi_loc=per_read \
+                                                --umi_len=${UMI_LEN} \
+                                                --html logs/fastp/${PAIR}_fastp.html \
+                                                -w $(echo ${THREADS}/3 | bc)\
+                                                -c \
+                                                --overlap_len_require 15 2> logs/fastp/${PAIR}_fastp.log) |
+                                        (bowtie2 \
+                                                --fast-local \
+                                                --un-conc trimmedFastq/${PAIR}.fastq \
+                                                --interleaved - \
+                                                -x ${RDNA} \
+                                                --threads $(echo ${THREADS}/3*2 | bc) 2> logs/rRNA/${PAIR}_rRNA_bowtie.log) > /dev/null
+                                fi
+                        done
+                # Branch for just 3' UMI
+                else
+                        for PAIR in $(ls fastq | sed 's/_R[1-2].*//' | uniq )
+                        do
+                                if [ ! -s trimmedFastq/${PAIR}_R1.fastq ]; then
+                                        echo "trimming adapters and filtering rRNA reads for "${PAIR}
+                                        (fastp \
+                                                -i fastq/${PAIR}_R1.fastq \
+                                                -I fastq/${PAIR}_R2.fastq \
+                                                --adapter_sequence    ${ADAPTOR_1} \
+                                                --adapter_sequence_r2 ${ADAPTOR_2} \
+                                                --umi \
+                                                --stdout \
+                                                --umi_loc=read1 \
+                                                --umi_len=${UMI_LEN} \
+                                                --html logs/fastp/${PAIR}_fastp.html \
+                                                -w $(echo ${THREADS}/3 | bc) \
+                                                -c \
+                                                --overlap_len_require 15 2> logs/fastp/${PAIR}_fastp.log) |
+                                        (bowtie2 \
+                                                --fast-local \
+                                                --un-conc trimmedFastq/${PAIR}.fastq \
+                                                --interleaved - \
+                                                -x ${RDNA} \
+                                                --threads $(echo ${THREADS}/3*2 | bc) 2> logs/rRNA/${PAIR}_rRNA_bowtie.log) > /dev/null
+                                fi
+                        done
+                fi
         # Branch for only 5' UMI or no UMIs
         else
-       # Branch for only 5' UMI
-        if [[ $FIVEP_UMI == "Y" ]]
-            then
-            for PAIR in $(ls fastq | sed 's/_R[1-2].*//' | uniq )
+                # Branch for only 5' UMI
+                if [[ ${FIVEP_UMI} == "Y" ]]; then
+                        for PAIR in $(ls fastq | sed 's/_R[1-2].*//' | uniq )
                 do
                     if [ ! -s trimmedFastq/${PAIR}_R1.fastq ]
                         then
@@ -185,8 +180,8 @@ if [[ ${PAIRED} == "Y" ]]; then
                         (fastp \
                         -i fastq/${PAIR}_R1.fastq \
                         -I fastq/${PAIR}_R2.fastq \
-                        --adapter_sequence $ADAPTOR_1 \
-                        --adapter_sequence_r2 $ADAPTOR_2 \
+                        --adapter_sequence    ${ADAPTOR_1} \
+                        --adapter_sequence_r2 ${ADAPTOR_2} \
                         --umi \
                         --stdout \
                         --umi_loc=read2 \
@@ -205,7 +200,7 @@ if [[ ${PAIRED} == "Y" ]]; then
                 done
                 # Branch for no UMI
 
-                               else
+            else
                     for PAIR in $(ls fastq | sed 's/_R[1-2].*//' | uniq )
                     do
                         if [ ! -s trimmedFastq/${PAIR}_R1.fastq ]
@@ -214,8 +209,8 @@ if [[ ${PAIRED} == "Y" ]]; then
                             (fastp \
                             -i fastq/${PAIR}_R1.fastq \
                             -I fastq/${PAIR}_R2.fastq \
-                            --adapter_sequence $ADAPTOR_1 \
-                            --adapter_sequence_r2 $ADAPTOR_2 \
+                            --adapter_sequence    ${ADAPTOR_1} \
+                            --adapter_sequence_r2 ${ADAPTOR_2} \
                             --stdout \
                             --html logs/fastp/${PAIR}_fastp.html \
                             -w $(echo ${THREADS}/3 | bc) \
@@ -472,6 +467,8 @@ do
 done
 
 
+
+samtools view -h $FILE | sed '/random/d;/chrUn/d;/chrEBV/d;/chrM/d;/chrY/d' > ${sample}.filtered.sam
 
 
 
