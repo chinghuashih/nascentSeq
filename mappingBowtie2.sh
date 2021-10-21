@@ -23,6 +23,7 @@ THREADS=4 # Threads to use for multithreaded applications
 UMI_LEN=6 # Length of UMI in basepairs
 
 PAIRED="Y"
+SPIKEIN="Y"
 
 ## UMI Flags (set to Y or N as appropriate)
 FIVEP_UMI="Y"  # Is there a UMI on the 5' end of the read?
@@ -104,7 +105,7 @@ NUM=$(ls fastq | wc -l)
 NUM_REDUCED=$(ls fastq | sed 's/_R.*//' | uniq | wc -l)
 if [[ ${NUM} == ${NUM_REDUCED} ]]; then
 	PAIRED="N"
-	echo "detected ${NUM} singchrKI270727le end fastq files. exiting..."
+	echo "detected ${NUM} single end fastq files. exiting..."
 	exit
 else
 	PAIRED="Y"
@@ -114,10 +115,8 @@ fi
 ### Trimming adapters and filtering rRNA reads
 echo "trimming adapters and filtering rDNA reads..."
 if [[ ${PAIRED} == "Y" ]]; then
-
 	## Branches for either 3' UMI or both UMIs
 	if [[ ${THREEP_UMI} == "Y" ]]; then
-
 		# Branch for both UMIs
 		if [[ ${FIVEP_UMI} == "Y" ]]; then
 			for PAIR in $(ls fastq | sed 's/_R[1-2].*//' | uniq )
@@ -125,8 +124,8 @@ if [[ ${PAIRED} == "Y" ]]; then
 				if [ ! -s trimmedFastq/${PAIR}_R1.fastq ]; then
 					echo "trimming adapters and filtering rRNA reads for ${PAIR}"
 					(fastp \
-						-i fastq/${PAIR}_R1.fastq \
-						-I fastq/${PAIR}_R2.fastq \
+						--in1 fastq/${PAIR}_R1.fastq \
+						--in2 fastq/${PAIR}_R2.fastq \
 						--adapter_sequence    ${ADAPTOR_1} \
 						--adapter_sequence_r2 ${ADAPTOR_2} \
 						--umi \
@@ -134,8 +133,8 @@ if [[ ${PAIRED} == "Y" ]]; then
 						--umi_loc=per_read \
 						--umi_len=${UMI_LEN} \
 						--html logs/fastp/${PAIR}_fastp.html \
-						-w $(echo ${THREADS}/3 | bc)\
-						-c \
+						--thread $(echo ${THREADS}/3 | bc)\
+						--correction \
 						--overlap_len_require 15 2> logs/fastp/${PAIR}_fastp.log) |
 					(bowtie2 \
 						--fast-local \
@@ -145,7 +144,6 @@ if [[ ${PAIRED} == "Y" ]]; then
 						--threads $(echo ${THREADS}/3*2 | bc) 2> logs/rRNA/${PAIR}_rRNA_bowtie.log) > /dev/null
 				fi
 			done
-
 		# Branch for just 3' UMI
 		else
 			for PAIR in $(ls fastq | sed 's/_R[1-2].*//' | uniq )
@@ -162,7 +160,7 @@ if [[ ${PAIRED} == "Y" ]]; then
 						--umi_loc=read1 \
 						--umi_len=${UMI_LEN} \
 						--html logs/fastp/${PAIR}_fastp.html \
-						-w $(echo ${THREADS}/3 | bc) \
+						--thread $(echo ${THREADS}/3 | bc) \
 						-c \
 						--overlap_len_require 15 2> logs/fastp/${PAIR}_fastp.log) |
 					(bowtie2 \
@@ -174,10 +172,8 @@ if [[ ${PAIRED} == "Y" ]]; then
 				fi
 			done
 		fi
-
 	# Branch for only 5' UMI or no UMIs
 	else
-
 		# Branch for only 5' UMI
 		if [[ ${FIVEP_UMI} == "Y" ]]; then
 			for PAIR in $(ls fastq | sed 's/_R[1-2].*//' | uniq )
@@ -194,7 +190,7 @@ if [[ ${PAIRED} == "Y" ]]; then
 						--umi_loc=read2 \
 						--umi_len=${UMI_LEN} \
 						--html logs/fastp/${PAIR}_fastp.html \
-						-w $(echo ${THREADS}/3 | bc) \
+						--thread $(echo ${THREADS}/3 | bc) \
 						-c \
 						--overlap_len_require 15 2> logs/fastp/${PAIR}_fastp.log) |
 					(bowtie2 \
@@ -205,7 +201,6 @@ if [[ ${PAIRED} == "Y" ]]; then
 						--threads $(echo ${THREADS}/3*2 | bc) 2> logs/rRNA/${PAIR}_rRNA_bowtie.log) > /dev/null
 				fi
 			done
-
 		# Branch for no UMI
 		else
 			for PAIR in $(ls fastq | sed 's/_R[1-2].*//' | uniq )
@@ -219,7 +214,7 @@ if [[ ${PAIRED} == "Y" ]]; then
 						--adapter_sequence_r2 ${ADAPTOR_2} \
 						--stdout \
 						--html logs/fastp/${PAIR}_fastp.html \
-						-w $(echo ${THREADS}/3 | bc) \
+						--thread $(echo ${THREADS}/3 | bc) \
 						-c \
 						--overlap_len_require 15 2> logs/fastp/${PAIR}_fastp.log) |
 					(bowtie2 \
@@ -246,46 +241,39 @@ for FILE in trimmedFastq/*2.fastq
 do
 	if [ ! -s ${FILE/.2.fastq/_R2.fastq} ]; then
 		mv ${FILE} ${FILE/.2.fastq/_R2.fastq}
-    fi
+	fi
 done
 
-
-
-
-
-### Aligning to spike in genome to get normalization factors
-#mkdir -p spikeBAM
-#mkdir -p logs/spikeAlign
-
-#if [[ "$PAIRED" == "Y" ]]
-#then
-#    for PAIR in $(ls trimmedFastq | sed 's/_R[1-2].*//' | uniq )
-#    do
-#        if [ ! -s "spikeBAM/${PAIR}_hg38.BAM" ]
-#        then
-#            echo "aligning ${PAIR} to spike in genome"
-#            (bowtie2 \
-#            --local \
-#            --very-sensitive-local \
-#            --threads $(echo ${THREADS}/3*2 | bc) \
-#            --no-unal \
-#            --no-mixed \
-#            --no-discordant \
-#            -x "$GENOME_SPIKE" \
-#            -1 "trimmedFastq/${PAIR}_R1.fastq" \
-#            -2 "trimmedFastq/${PAIR}_R2.fastq" \
-#            2> logs/spikeAlign/${PAIR}_spikeAlign.log) |
-#            samtools view -hS -f 2 -q ${MAPQ} |
-#            perl -n -e 'print $_ if (/^\@/ || /'${SPIKE_PREFIX}'/ ) ' |
-#            samtools view -b | 
-#            samtools sort -@ $(echo ${THREADS}/3 | bc) -o spikeBAM/${PAIR}.BAM
-#            samtools index spikeBAM/${PAIR}.BAM
-#        fi
-#    done
-#fi
-
-### Aligning to experimental genome
 if [[ "${PAIRED}" == "Y" ]]; then
+	### Aligning to spike in genome to get normalization factors
+	if [[ "${SPIKEIN}" == "Y" ]]; then
+		mkdir -p spikeBAM
+		mkdir -p logs/spikeAlign
+
+		for PAIR in $(ls trimmedFastq | sed 's/_R[1-2].*//' | uniq )
+		do
+			if [ ! -s "spikeBAM/${PAIR}.BAM" ]; then
+				echo "aligning ${PAIR} to spike in genome"
+				(bowtie2 \
+					--local \
+					--very-sensitive-local \
+					--threads $(echo ${THREADS}/3*2 | bc) \
+					--no-unal \
+					--no-mixed \
+					--no-discordant \
+					-x "${GENOME_SPIKE"} \
+					-1 "trimmedFastq/${PAIR}_R1.fastq" \
+					-2 "trimmedFastq/${PAIR}_R2.fastq" 2> logs/spikeAlign/${PAIR}_spikeAlign.log) |
+				samtools view -hS -f 2 -q ${MAPQ} |
+				perl -n -e 'print $_ if (/^\@/ || /'${SPIKE_PREFIX}'/ ) ' |
+				samtools view -b |
+				samtools sort -@ $(echo ${THREADS}/3 | bc) -o spikeBAM/${PAIR}.BAM
+				samtools index spikeBAM/${PAIR}.BAM
+			fi
+		done
+	fi
+
+	### Aligning to experimental genome
 	for PAIR in $(ls trimmedFastq | sed 's/_R[1-2].*//' | uniq )
 	do
 		if [ ! -s "BAM/${PAIR}.bam" ]; then
@@ -321,27 +309,26 @@ do
 			--output-stats=stats/${OFILE} \
 			--log="logs/deDup/$(basename ${FILE%.bam}_deDup.log)"
 		samtools index BAMdeDuped/${OFILE}_deDuped.bam
-fi
+	fi
 done
 
 ## deduplicating with UMIs
-#mkdir -p spikeBAMdeDuped
-#mkdir -p logs/spikedeDup
-#
-#for FILE in spikeBAM/*.BAM
-#do
-#    if [ ! -s "spikeBAMdeDuped/$(basename ${FILE%.BAM}_deDuped.BAM)" ]
-#    then
-#        (
-#        umi_tools dedup \
-#        -I "$FILE" \
-#        --paired \
-#        --umi-separator=":" \
-#        -S "spikeBAMdeDuped/$(basename ${FILE%.BAM}_deDuped.BAM)" \
-#        )> "logs/spikedeDup/$(basename ${FILE%.BAM}_deDup.log)" &&
-#        samtools index "spikeBAMdeDuped/$(basename ${FILE%.BAM}_deDuped.BAM)" 
-#    fi
-#done
+if [[ "${SPIKEIN}" == "Y" ]]; then
+	mkdir -p spikeBAMdeDuped
+	mkdir -p logs/spikedeDup
+
+	for FILE in spikeBAM/*.BAM
+	do
+		if [ ! -s "spikeBAMdeDuped/$(basename ${FILE%.BAM}_deDuped.BAM)" ]; then
+			(umi_tools dedup \
+				-I "$FILE" \
+				--paired \
+				--umi-separator=":" \
+				-S "spikeBAMdeDuped/$(basename ${FILE%.BAM}_deDuped.BAM)")> "logs/spikedeDup/$(basename ${FILE%.BAM}_deDup.log)" &&
+			samtools index "spikeBAMdeDuped/$(basename ${FILE%.BAM}_deDuped.BAM)"
+		fi
+	done
+fi
 
 ### Generating infoTable
 if [ ! -s info/infoTable.tsv ]; then
@@ -359,74 +346,95 @@ if [ ! -s info/infoTable.tsv ]; then
 	for SAMPLE in $(ls BAM/*.bam | sed 's/.bam//' | sed 's/BAM\///' )
 	do
 		NAME=${SAMPLE}
-		RAW_READS=$(cat logs/fastp/${SAMPLE}_fastp.log |
-						grep "total reads:" | head -n 1 | 
-						awk '{print $3}')
-		TRIMMED_READS=$(cat logs/fastp/${SAMPLE}_fastp.log |
-						grep "total reads:" | tail -n 1 |
-						awk '{print $3}')
-		PER_DIMER=$(echo "(1-"${TRIMMED_READS}"/"${RAW_READS}")*100" | bc -l)%
-		INSERT_SIZE=$(cat logs/fastp/${SAMPLE}_fastp.log |
-						grep "Insert size peak" |
-						awk '{print $8}')
-		PASSED_FILTERS=$(cat logs/align/${SAMPLE}_align.log |
-						grep "reads; of these:$" |
-						awk '{print $1}')
-		RRNA=$(echo ${TRIMMED_READS}"-"${PASSED_FILTERS} | bc )
-		PER_RRNA=$(echo ${RRNA}"/"${RAW_READS}"*100" | bc -l)%
-		B_CONC=$(cat logs/align/${SAMPLE}_align.log |
-					grep "aligned concordantly exactly 1 time$" |
-					awk '{print $1}')
-		B_MULTI=$(cat logs/align/${SAMPLE}_align.log |
-						grep "aligned concordantly >1 times$" |
-						awk '{print $1}')
-		B_UNAL=$(cat logs/align/${SAMPLE}_align.log |
-						grep "aligned concordantly 0 times$" |
-						awk '{print $1}')
-		B_OAP=$(cat logs/align/${SAMPLE}_align.log |
-						grep "overall alignment rate$" |
-						awk '{print $1}')
-		B_CONC_PER=$(echo ${B_CONC}"/"${PASSED_FILTERS}"*100" | bc -l)%
-		B_MULTI_PER=$(echo ${B_MULTI}"/"${PASSED_FILTERS}"*100" | bc -l)%
-		B_UNAL_PER=$(echo ${B_UNAL}"/"${PASSED_FILTERS}"*100" | bc -l)%
-		UNIQ_MAPPED=$(cat logs/deDup/${SAMPLE}_deDup.log |
-						grep "Input Reads:" |
-						awk '{print $10}')
-		UNIQ_MAPPED_DEDUP=$(cat logs/deDup/${SAMPLE}_deDup.log |
-						grep "Number of reads out:" |
-						awk '{print $8}')
-		PER_DUPS=$(echo "(1-"${UNIQ_MAPPED_DEDUP}"/"${UNIQ_MAPPED}")*100" | bc -l)%
 
-	#    UNIQ_MAPPED_SPIKE=$(cat logs/spikedeDup/${SAMPLE}_deDup.log |
-	#            grep "Input Reads:" | awk '{print $10}')
-	#    UNIQ_MAPPED_DEDUP_SPIKE=$(cat logs/spikedeDup/${SAMPLE}_deDup.log |
-	#            grep "Number of reads out:" | awk '{print $8}')
-	#    PER_DUPS_SPIKE=$(echo "(1-"${UNIQ_MAPPED_DEDUP_SPIKE}"/"${UNIQ_MAPPED_SPIKE}")*100" | bc -l)%
+		if [[ "${SPIKEIN}" == "N" ]]; then
+			RAW_READS=$(        cat logs/fastp/${SAMPLE}_fastp.log | grep "total reads:"             | head -n 1 | awk '{print $3}' )
+			TRIMMED_READS=$(    cat logs/fastp/${SAMPLE}_fastp.log | grep "total reads:"             | tail -n 1 | awk '{print $3}' )
+			INSERT_SIZE=$(      cat logs/fastp/${SAMPLE}_fastp.log | grep "Insert size peak"                     | awk '{print $8}' )
+			PASSED_FILTERS=$(   cat logs/align/${SAMPLE}_align.log | grep "reads; of these:$"                    | awk '{print $1}' )
+			B_CONC=$(           cat logs/align/${SAMPLE}_align.log | grep "aligned concordantly exactly 1 time$" | awk '{print $1}' )
+			B_MULTI=$(          cat logs/align/${SAMPLE}_align.log | grep "aligned concordantly >1 times$"       | awk '{print $1}' )
+			B_UNAL=$(           cat logs/align/${SAMPLE}_align.log | grep "aligned concordantly 0 times$"        | awk '{print $1}' )
+			B_OAP=$(            cat logs/align/${SAMPLE}_align.log | grep "overall alignment rate$"              | awk '{print $1}' )
+			UNIQ_MAPPED=$(      cat logs/deDup/${SAMPLE}_deDup.log | grep "Input Reads:"                         | awk '{print $10}')
+			UNIQ_MAPPED_DEDUP=$(cat logs/deDup/${SAMPLE}_deDup.log | grep "Number of reads out:"                 | awk '{print $8}' )
 
-    	echo -e \
-			${NAME}'\t'\
-		    ${RAW_READS}'\t'\
-		    ${TRIMMED_READS}'\t'\
-		    ${PER_DIMER}'\t'\
-		    ${INSERT_SIZE}'\t'\
-		    ${RRNA}'\t'\
-		    ${PER_RRNA}'\t'\
-		    ${PASSED_FILTERS}'\t'\
-		    ${B_CONC}'\t'\
-		    ${B_MULTI}'\t'\
-		    ${B_UNAL}'\t'\
-		    ${B_OAP}'\t'\
-		    ${B_CONC_PER}'\t'\
-		    ${B_MULTI_PER}'\t'\
-		    ${B_UNAL_PER}'\t'\
-		    ${UNIQ_MAPPED}'\t'\
-		    ${UNIQ_MAPPED_DEDUP}'\t'\
-		    ${PER_DUPS}'\t'\
-		    >> info/infoTable.tsv
+			PER_DIMER=$(  echo "(1-"${TRIMMED_READS}"/"${RAW_READS}")*100"       | bc -l)%
+			RRNA=$(       echo ${TRIMMED_READS}"-"${PASSED_FILTERS}              | bc   )
+			PER_RRNA=$(   echo ${RRNA}"/"${RAW_READS}"*100"                      | bc -l)%
+			B_CONC_PER=$( echo ${B_CONC}"/"${PASSED_FILTERS}"*100"               | bc -l)%
+			B_MULTI_PER=$(echo ${B_MULTI}"/"${PASSED_FILTERS}"*100"              | bc -l)%
+			B_UNAL_PER=$( echo ${B_UNAL}"/"${PASSED_FILTERS}"*100"               | bc -l)%
+			PER_DUPS=$(   echo "(1-"${UNIQ_MAPPED_DEDUP}"/"${UNIQ_MAPPED}")*100" | bc -l)%
 
-	#    $UNIQ_MAPPED_SPIKE'\t'\
-	#    $UNIQ_MAPPED_DEDUP_SPIKE'\t'\
-	#    $PER_DUPS_SPIKE  >> info/infoTable.tsv
+			echo -e \
+				${NAME}'\t'\
+				${RAW_READS}'\t'\
+				${TRIMMED_READS}'\t'\
+				${PER_DIMER}'\t'\
+				${INSERT_SIZE}'\t'\
+				${RRNA}'\t'\
+				${PER_RRNA}'\t'\
+				${PASSED_FILTERS}'\t'\
+				${B_CONC}'\t'\
+				${B_MULTI}'\t'\
+				${B_UNAL}'\t'\
+				${B_OAP}'\t'\
+				${B_CONC_PER}'\t'\
+				${B_MULTI_PER}'\t'\
+				${B_UNAL_PER}'\t'\
+				${UNIQ_MAPPED}'\t'\
+				${UNIQ_MAPPED_DEDUP}'\t'\
+				${PER_DUPS}'\t' >> info/infoTable.tsv
+
+		elif [[ "${SPIKEIN}" == "Y" ]]; then
+			RAW_READS=$(              cat logs/fastp/${SAMPLE}_fastp.log      | grep "total reads:"             | head -n 1 | awk '{print $3}' )
+			TRIMMED_READS=$(          cat logs/fastp/${SAMPLE}_fastp.log      | grep "total reads:"             | tail -n 1 | awk '{print $3}' )
+			INSERT_SIZE=$(            cat logs/fastp/${SAMPLE}_fastp.log      | grep "Insert size peak"                     | awk '{print $8}' )
+			PASSED_FILTERS=$(         cat logs/align/${SAMPLE}_align.log      | grep "reads; of these:$"                    | awk '{print $1}' )
+			B_CONC=$(                 cat logs/align/${SAMPLE}_align.log      | grep "aligned concordantly exactly 1 time$" | awk '{print $1}' )
+			B_MULTI=$(                cat logs/align/${SAMPLE}_align.log      | grep "aligned concordantly >1 times$"       | awk '{print $1}' )
+			B_UNAL=$(                 cat logs/align/${SAMPLE}_align.log      | grep "aligned concordantly 0 times$"        | awk '{print $1}' )
+			B_OAP=$(                  cat logs/align/${SAMPLE}_align.log      | grep "overall alignment rate$"              | awk '{print $1}' )
+			UNIQ_MAPPED=$(            cat logs/deDup/${SAMPLE}_deDup.log      | grep "Input Reads:"                         | awk '{print $10}')
+			UNIQ_MAPPED_DEDUP=$(      cat logs/deDup/${SAMPLE}_deDup.log      | grep "Number of reads out:"                 | awk '{print $8}' )
+			UNIQ_MAPPED_SPIKE=$(      cat logs/spikedeDup/${SAMPLE}_deDup.log | grep "Input Reads:"                         | awk '{print $10}')
+			UNIQ_MAPPED_DEDUP_SPIKE=$(cat logs/spikedeDup/${SAMPLE}_deDup.log | grep "Number of reads out:"                 | awk '{print $8}' )
+
+			PER_DIMER=$(     echo "(1-"${TRIMMED_READS}"/"${RAW_READS}")*100"                   | bc -l)%
+			RRNA=$(          echo ${TRIMMED_READS}"-"${PASSED_FILTERS}                          | bc   )
+			PER_RRNA=$(      echo ${RRNA}"/"${RAW_READS}"*100"                                  | bc -l)%
+			B_CONC_PER=$(    echo ${B_CONC}"/"${PASSED_FILTERS}"*100"                           | bc -l)%
+			B_MULTI_PER=$(   echo ${B_MULTI}"/"${PASSED_FILTERS}"*100"                          | bc -l)%
+			B_UNAL_PER=$(    echo ${B_UNAL}"/"${PASSED_FILTERS}"*100"                           | bc -l)%
+			PER_DUPS=$(      echo "(1-"${UNIQ_MAPPED_DEDUP}"/"${UNIQ_MAPPED}")*100"             | bc -l)%
+			PER_DUPS_SPIKE=$(echo "(1-"${UNIQ_MAPPED_DEDUP_SPIKE}"/"${UNIQ_MAPPED_SPIKE}")*100" | bc -l)%
+			
+			echo -e \
+				${NAME}'\t'\
+				${RAW_READS}'\t'\
+				${TRIMMED_READS}'\t'\
+				${PER_DIMER}'\t'\
+				${INSERT_SIZE}'\t'\
+				${RRNA}'\t'\
+				${PER_RRNA}'\t'\
+				${PASSED_FILTERS}'\t'\
+				${B_CONC}'\t'\
+				${B_MULTI}'\t'\
+				${B_UNAL}'\t'\
+				${B_OAP}'\t'\
+				${B_CONC_PER}'\t'\
+				${B_MULTI_PER}'\t'\
+				${B_UNAL_PER}'\t'\
+				${UNIQ_MAPPED}'\t'\
+				${UNIQ_MAPPED_DEDUP}'\t'\
+				${PER_DUPS}'\t'\
+				${UNIQ_MAPPED_SPIKE}'\t'\
+				${UNIQ_MAPPED_DEDUP_SPIKE}'\t'\
+				${PER_DUPS_SPIKE} >> info/infoTable.tsv
+		else
+			echo "wrong spikein type"
+		fi	
 	done
 fi
 
@@ -459,18 +467,54 @@ do
 		--samFlagInclude 98
 #       --normalizeUsing None \
 	fi
+
+######################################
+
+	if [ ! -s "bigWig/$(basename ${FILE/.bam/_fwd.10.bw})" ]; then
+		bamCoverage \
+			--bam ${FILE} \
+			--skipNonCoveredRegions \
+			--outFileName bigWig/$(basename ${FILE/.bam/_fwd.10.bw}) \
+			--binSize 1 \
+			--numberOfProcessors ${THREADS} \
+			--Offset 1 \
+			--samFlagInclude 82
+	fi
+
+	if [ ! -s "bigWig/$(basename ${FILE/.bam/_rev.10.bw})" ]; then
+		bamCoverage \
+			--bam ${FILE} \
+			--skipNonCoveredRegions \
+			--outFileName bigWig/$(basename ${FILE/.bam/_rev.10.bw}) \
+			--binSize 1 \
+			--numberOfProcessors ${THREADS} \
+			--Offset 1 \
+		--samFlagInclude 98
+	fi
+
+
+
+	if [ ! -s "bigWig/$(basename ${FILE/.bam/_fwd.L.bw})" ]; then
+		bamCoverage \
+			--bam ${FILE} \
+			--skipNonCoveredRegions \
+			--outFileName bigWig/$(basename ${FILE/.bam/_fwd.L.bw}) \
+			--binSize 1 \
+			--numberOfProcessors ${THREADS} \
+			--samFlagInclude 82
+	fi
+
+	if [ ! -s "bigWig/$(basename ${FILE/.bam/_rev.L.bw})" ]; then
+		bamCoverage \
+			--bam ${FILE} \
+			--skipNonCoveredRegions \
+			--outFileName bigWig/$(basename ${FILE/.bam/_rev.L.bw}) \
+			--binSize 1 \
+			--numberOfProcessors ${THREADS} \
+		--samFlagInclude 98
+	fi
 done
 
-samtools view -h $FILE | sed '/random/d;/chrUn/d;/chrEBV/d;/chrM/d;/chrY/d' > ${sample}.filtered.sam
 
-
-
-
-
-
-
-
-
-
-
+#samtools view -h ${FILE} | sed '/random/d;/chrUn/d;/chrEBV/d;/chrM/d;/chrY/d' > ${sample}.filtered.sam
 
