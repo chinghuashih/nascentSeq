@@ -84,7 +84,8 @@ do
 		--outFileName matrix_f2.mat.gz \
 		--missingDataAsZero \
 		--samplesLabel ${sample} \
-		--numberOfProcessors ${numberOfProcessors}
+		--numberOfProcessors ${numberOfProcessors} \
+		--scale -1
 
 	computeMatrix reference-point \
 		--scoreFileName ${forward} \
@@ -96,8 +97,7 @@ do
 		--outFileName matrix_r1.mat.gz \
 		--missingDataAsZero \
 		--samplesLabel ${sample} \
-		--numberOfProcessors ${numberOfProcessors} \
-		--scale -1
+		--numberOfProcessors ${numberOfProcessors}
 
 	computeMatrix reference-point \
 		--scoreFileName ${reverse} \
