@@ -50,9 +50,9 @@ do
 		--numberOfProcessors ${numberOfProcessors} \
 		--scale -1
 
-	computeMatrixOperations relabel -m matrix_f1.mat.gz -o matrix_f1a.mat.gz --groupLabels "${sample}"
-	computeMatrixOperations relabel -m matrix_f2.mat.gz -o matrix_f2a.mat.gz --groupLabels "${sample}"
-	computeMatrixOperations rbind -m matrix_f1a.mat.gz matrix_f2a.mat.gz -o matrix.mat.gz
+	computeMatrixOperations relabel -m matrix_f1.mat.gz                    -o matrix_f1a.mat.gz --groupLabels "${sample}"
+	computeMatrixOperations relabel -m matrix_f2.mat.gz                    -o matrix_f2a.mat.gz --groupLabels "${sample}"
+	computeMatrixOperations rbind   -m matrix_f1a.mat.gz matrix_f2a.mat.gz -o matrix.mat.gz
 
 	plotProfile \
 		--matrixFile matrix.mat.gz \
