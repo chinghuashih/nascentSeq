@@ -115,18 +115,8 @@ else
 fi
 
 
-
-
-
-
-### Trimming adapters and filtering rRNA reads
-echo "trimming adapters and filtering rDNA reads..."
-
-
-
-
 if [[ ${PAIRED} == "N" ]]; then
-
+	### Trimming adapters and filtering rRNA reads
 	echo "trimming adapters and filtering rDNA reads..."
 
 	## 3' UMI
@@ -187,7 +177,6 @@ if [[ ${PAIRED} == "N" ]]; then
 
 	### Aligning to spike in genome to get normalization factors
 	for PAIR in $(ls trimmedFastq | sed 's/_R[1-2].*//' | uniq )
-#	for PAIR in $(ls trimmedFastq)
 	do
 		if [ ! -s "spikeBAM/${PAIR}.BAM" ]; then
 			echo "aligning ${PAIR} to spike in genome"
