@@ -23,21 +23,11 @@ system("ln -rs *_3pr_reverse.bedGraph reverse")
 
 outPrefix <- sapply(strsplit(getwd(), "/"), tail, 2)[1]
 
+# make stranded begraphs
 setwd("forward")
-system(
-	paste(
-		paste(scriptsPath, "AdelmanLab/NIH_scripts/bedgraphs2stdBedGraph/bedgraphs2stdBedGraph", sep = "/"),
-		paste(outPrefix, "F", sep = "_")
-	)
-)
-
+system(paste(paste(scriptsPath, "path/bedgraphs2stdBedGraph", sep = "/"), paste(outPrefix, "F", sep = "_")))
 setwd("../reverse")
-system(
-	paste(
-		paste(scriptsPath, "AdelmanLab/NIH_scripts/bedgraphs2stdBedGraph/bedgraphs2stdBedGraph", sep = "/"),
-		paste(outPrefix, "R", sep = "_")
-	)
-)
+system(paste(paste(scriptsPath, "path/bedgraphs2stdBedGraph", sep = "/"), paste(outPrefix, "R", sep = "_")))
 
 setwd("../../")
 tssPrefix <- sapply(
@@ -51,17 +41,11 @@ system("mkdir pro_tss")
 system(
 	paste(
 		scriptsPath,
-		"/AdelmanLab/NIH_scripts/make_heatmap/make_heatmap -t 6 -l s -s s --nohead -p bedGraphs/forward/",
-		outPrefix,
-		"_F.bedGraph -m bedGraphs/reverse/",
-		outPrefix,
-		"_R.bedGraph -- ",
-		tssPath,
-		" pro_tss/",
-		outPrefix,
-		"_",
-		tssPrefix,
-		"_25mer_+-2kb.txt -2000 25 160", sep = ""
+		"path/make_heatmap -t 6 -l s -s s --nohead ",
+		"-p bedGraphs/forward/", outPrefix, "_F.bedGraph ",
+		"-m bedGraphs/reverse/", outPrefix, "_R.bedGraph ",
+		"-- ",
+		tssPath, " pro_tss/", outPrefix, "_", tssPrefix, "_25mer_+-2kb.txt -2000 25 160", sep = ""
 	)
 )
 
