@@ -105,8 +105,8 @@ tssNonDom <- tssActive[!(tssActive %in% unlist(domTss))]
 write.table(
 	tssList[tssNonDom, ],
 	paste("pro_tss/", outPrefix, "_", tssPrefix, "_non-dominant_formakeheatmap.txt", sep = ""),
-	quote = FALSE,
-	sep = "\t",
+	quote     = FALSE,
+	sep       = "\t",
 	col.names = FALSE
 )
 
